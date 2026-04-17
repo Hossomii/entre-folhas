@@ -1,8 +1,11 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem; // Sistema de input novo do Unity (teclado, controle, etc)
 
 public class PlayerMovement : MonoBehaviour
 {
+    private PlayerStats playerStats; // Referência para acessar o dano do ataque
+
     // =========================
     // COMPONENTES DO UNITY
     // =========================
@@ -17,7 +20,23 @@ public class PlayerMovement : MonoBehaviour
 
     public float speed = 1.5f;
     public float runSpeed = 2.5f;
-    public float rotationCam = 10f; 
+    public float rotationCam = 10f;
+
+    // =========================
+    // ATAQUE
+    // =========================
+
+    public float attackCooldown = 1f;
+    private float lastAttackTime;
+    private bool hasHitEnemy;
+
+    // =========================
+    // HIT DO ATAQUE
+    // =========================
+
+    [SerializeField] private Transform attackPoint; // ponto de onde o ataque sai
+    [SerializeField] private float attackRadius = 1f; // alcance do ataque
+    [SerializeField] private LayerMask enemyLayer; // layer dos inimigos
 
     // =========================
     // CONFIGURAÇÕES DE CHÃO
@@ -58,6 +77,7 @@ public class PlayerMovement : MonoBehaviour
     {
         controller = GetComponent<CharacterController>();
         animator = GetComponent<Animator>();
+        playerStats = GetComponent<PlayerStats>();
         myCamera = Camera.main.transform;
     }
 
@@ -69,7 +89,56 @@ public class PlayerMovement : MonoBehaviour
     {
         GroundCheck();
         Move();        
-        Jump();       
+        Jump();   
+        Attack();
+    }
+
+    private void Attack()
+    {
+        if (Mouse.current != null)
+        {
+            // clique esquerdo
+            if (Mouse.current.leftButton.wasPressedThisFrame)
+            {
+                // verifica cooldown
+                if (Time.time >= lastAttackTime + attackCooldown)
+                {
+                    lastAttackTime = Time.time;
+
+                    hasHitEnemy = false;
+
+                    // dispara animação
+                    animator.SetTrigger("Attack");
+                }
+            }
+        }
+    }
+
+    public void AttackHit()
+    {
+        if (hasHitEnemy) return;
+
+        Collider[] hits = Physics.OverlapSphere(attackPoint.position, attackRadius, enemyLayer);
+
+        foreach (Collider enemy in hits)
+        {
+            EnemyHealth enemyHealth = enemy.GetComponent<EnemyHealth>();
+
+            if (enemyHealth != null)
+            {
+                enemyHealth.TakeDamage(playerStats.attackDamage);
+                hasHitEnemy = true;
+                break;
+            }
+        }
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (attackPoint == null) return;
+
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(attackPoint.position, attackRadius);
     }
 
     // =========================
